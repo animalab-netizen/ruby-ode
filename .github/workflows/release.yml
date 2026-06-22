@@ -1,0 +1,40 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Validate tag matches gem version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          PROJECT_VERSION=$(grep -oE 'spec.version = "([^"]+)"' ruby-ode.gemspec | sed 's/.*"\(.*\)"/\1/')
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$PROJECT_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Tag version ($TAG_VERSION) does not match ruby-ode.gemspec version ($PROJECT_VERSION)."
+            exit 1
+          fi
+
+      - name: Run tests
+        run: ruby -Ilib test/test_runtime.rb
+
+      - name: Build gem
+        run: gem build ruby-ode.gemspec
